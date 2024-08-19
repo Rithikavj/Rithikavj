@@ -49,13 +49,13 @@ I am a passionate **Software Developer** with a focus on **Front End Web Develop
 ## 📫 Connect with Me
  
 <p align="left">
-<a href="https://www.linkedin.com/in/m-nandakumaran-815b65248/" target="_blank">
+<a href="https://www.linkedin.com/in/rithika-sri-reddy-vj-021a52249/" target="_blank">
 <img src="https://img.icons8.com/color/48/000000/linkedin.png" alt="LinkedIn" width="40" height="40"/>
 </a>
-<a href="https://x.com/NandakumaranM?t=FibVdMukZVnaESk6BGz94g&s=08" target="_blank">
+<a href="https://x.com/Rithikavj11" target="_blank">
 <img src="https://img.icons8.com/?size=512&id=jlpBF1fJe9fs&format=png" alt="X (formerly Twitter)" width="40" height="40"/>
 </a>
-<a href="https://stackoverflow.com/users/25207920/nandhu" target="_blank">
+<a href="https://stackoverflow.com/users/26873104/rithika-sri-reddy-v-j" target="_blank">
 <img src="https://img.icons8.com/color/48/000000/stackoverflow.png" alt="Stack Overflow" width="40" height="40"/>
 </a>
 </p>
