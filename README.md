@@ -6,7 +6,7 @@ I am a passionate **Software Developer** with a focus on **Front End Web Develop
  
 - 🔭 I’m currently working on projects related to **plant health monitoring** and **accessible applications** for the visually impaired.
 - 🌱 I’m currently learning advanced **Machine Learning** and **Deep Learning** techniques.
-- 📫 How to reach me: [mnandakumaran83@gmail.com](mailto:mnandakumaran83@gmail.com)
+- 📫 How to reach me: [rithuswetz@gmail.com](mailto:rithuswetz@gmail.com)
  
  
 ## 🔧 Skills & Tools
