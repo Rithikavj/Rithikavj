@@ -26,12 +26,17 @@ Single mobile app (React Native / Expo) with TWO role-based experiences sharing 
 4. **Profile** — host details, settings stubs, switch role, logout
 
 ## Tech Stack
-- **Frontend:** Expo Router (file-based), React Native, react-native-safe-area-context, expo-image, Feather icons
+- **Frontend:** Expo Router (file-based), React Native, react-native-safe-area-context, expo-image, Feather icons, **react-native-maps** (native interactive map on iOS/Android, illustrated fallback on web via `.web.tsx` platform split)
 - **Backend:** FastAPI + Motor (async MongoDB) + Pydantic v2
 - **Storage:** AsyncStorage via `@/src/utils/storage` for user/auth
-- **Real-time:** Polling (4–6s) on queue/order screens
+- **Real-time:** Polling (4–6s) on queue/order/dashboard/analytics screens
 - **Auth:** Mocked phone OTP (header `X-User-Id` for API auth)
-- **Payments:** Mock "Pay & Confirm" — no real charge
+- **Payments:** Mock "Pay & Confirm" + Mock "Subscribe" — no real charges
+
+## Iteration 2 features
+- **Real interactive map** on iOS/Android (`react-native-maps`) with wait-time pin markers; web/Expo Go falls back to illustrated map. "List / Map" toggle on Discover.
+- **Host Analytics Dashboard** (`/app/host/analytics`) — headline KPIs (parties today vs yesterday w/ %change, revenue), hourly traffic bar chart w/ peak hour, 7-day trend, KPI grid (avg wait, seated, walk-away %, no-show %), top 5 selling items, snapshot insight. Backend: `GET /api/host/analytics`. Seed includes 35 historical queue entries + ~18 served orders + 50 weekly entries so analytics is rich on day 1.
+- **DineIQ Pass** (`/app/pass`) — Mock subscription, Monthly ₹99 / Yearly ₹999 (saves ₹189). Endpoints: `GET/POST /me/pass*`. **Real backend benefit:** Pass holders' queue entries are marked `is_priority=true` and sorted ahead of non-priority entries — they actually skip ahead 1–2 spots in every queue.
 
 ## Design System
 - **Dark theme**, primary teal `#19E0B7`, background `#0B0F19`
@@ -49,7 +54,6 @@ Seed reset: `POST /seed/reset`
 
 ## Out of MVP (future iterations)
 - Real Razorpay payments, real WhatsApp Business API alerts
-- Real interactive map (react-native-maps — needs dev build)
 - ML wait-time predictor v0 (linear regression)
-- Restaurant analytics dashboard, POS (Petpooja/Torqus) integration
-- DineIQ Pass purchase flow, priority queue logic
+- POS integration (Petpooja/Torqus)
+- Reviews & ratings, loyalty points, refer-a-friend
