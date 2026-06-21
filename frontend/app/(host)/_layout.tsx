@@ -1,12 +1,25 @@
 import { Feather } from "@expo/vector-icons";
-import { Tabs } from "expo-router";
+import { Tabs, useRouter } from "expo-router";
+import { useEffect } from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { loadUser } from "@/src/api";
 import { colors } from "@/src/theme";
 
 export default function HostLayout() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+
+  useEffect(() => {
+    (async () => {
+      const u = await loadUser();
+      if (u && u.role === "host" && !u.restaurant_id) {
+        router.replace("/host/setup");
+      }
+    })();
+  }, [router]);
+
   return (
     <Tabs
       screenOptions={({ route }) => ({

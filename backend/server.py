@@ -91,6 +91,8 @@ class Restaurant(BaseModel):
     distance_km: float
     lat: float
     lng: float
+    is_claimed: bool = False
+    owner_id: Optional[str] = None
     created_at: str = Field(default_factory=now_iso)
 
 
@@ -173,6 +175,42 @@ class OrderStatusUpdate(BaseModel):
 class WalkInReq(BaseModel):
     name: str
     party_size: int
+
+
+class CreateRestaurantReq(BaseModel):
+    name: str
+    cuisine: str
+    address: str
+    area: str
+    city: str
+    price_level: str = "₹₹"
+    base_wait_min: int = 10
+    capacity: int = 30
+    image: Optional[str] = None
+    hero_image: Optional[str] = None
+
+
+class UpdateRestaurantReq(BaseModel):
+    name: Optional[str] = None
+    cuisine: Optional[str] = None
+    address: Optional[str] = None
+    area: Optional[str] = None
+    city: Optional[str] = None
+    price_level: Optional[str] = None
+    base_wait_min: Optional[int] = None
+    capacity: Optional[int] = None
+    image: Optional[str] = None
+    hero_image: Optional[str] = None
+
+
+class MenuItemReq(BaseModel):
+    category: str
+    name: str
+    description: str = ""
+    price: int
+    image: Optional[str] = None
+    is_veg: bool = True
+    is_recommended: bool = False
 
 
 # ---------- App ----------
@@ -258,10 +296,8 @@ async def verify_otp(req: OTPVerify):
     user_dict = user.model_dump()
 
     if req.role == "host":
-        # assign first restaurant or create a default if none
-        restaurant = await db.restaurants.find_one({}, PROJECTION)
-        if restaurant:
-            user_dict["restaurant_id"] = restaurant["id"]
+        # Host signup: don't auto-assign a restaurant — they'll create or claim one
+        user_dict["restaurant_id"] = None
 
     await db.users.insert_one(user_dict)
     user_dict.pop("_id", None)
@@ -859,6 +895,140 @@ async def host_update_order_status(order_id: str, req: OrderStatusUpdate, x_user
         "served": "Enjoy your meal! Tap to rate your experience.",
     }.get(req.status, f"Order status: {req.status}")
     await push_notification(o["user_id"], "Order update", msg, "order")
+    return {"ok": True}
+
+
+# ---------- Host: Restaurant onboarding & menu CRUD ----------
+DEFAULT_REST_IMAGE = "https://images.pexels.com/photos/29222614/pexels-photo-29222614.jpeg"
+
+
+@api_router.get("/host/restaurants/unclaimed")
+async def list_unclaimed(x_user_id: str = Header(...)):
+    u = await db.users.find_one({"id": x_user_id}, PROJECTION)
+    if not u or u["role"] != "host":
+        raise HTTPException(403, "Host only")
+    items = await db.restaurants.find(
+        {"$or": [{"is_claimed": False}, {"is_claimed": {"$exists": False}}]},
+        PROJECTION,
+    ).to_list(200)
+    # also include the owner_id missing/null case
+    return [r for r in items if not r.get("owner_id")]
+
+
+@api_router.post("/host/restaurants")
+async def create_restaurant(req: CreateRestaurantReq, x_user_id: str = Header(...)):
+    u = await db.users.find_one({"id": x_user_id}, PROJECTION)
+    if not u or u["role"] != "host":
+        raise HTTPException(403, "Host only")
+    if u.get("restaurant_id"):
+        raise HTTPException(400, "You already manage a restaurant")
+    r = Restaurant(
+        name=req.name, cuisine=req.cuisine, cuisines=[req.cuisine],
+        rating=4.0, price_level=req.price_level,
+        address=req.address, area=req.area, city=req.city,
+        image=req.image or DEFAULT_REST_IMAGE,
+        hero_image=req.hero_image or req.image or DEFAULT_REST_IMAGE,
+        base_wait_min=req.base_wait_min, capacity=req.capacity,
+        distance_km=1.0, lat=13.0418, lng=80.2341,
+        is_claimed=True, owner_id=x_user_id,
+    )
+    await db.restaurants.insert_one(r.model_dump())
+    await db.users.update_one({"id": x_user_id}, {"$set": {"restaurant_id": r.id}})
+    return r.model_dump()
+
+
+@api_router.post("/host/restaurants/{restaurant_id}/claim")
+async def claim_restaurant(restaurant_id: str, x_user_id: str = Header(...)):
+    u = await db.users.find_one({"id": x_user_id}, PROJECTION)
+    if not u or u["role"] != "host":
+        raise HTTPException(403, "Host only")
+    if u.get("restaurant_id"):
+        raise HTTPException(400, "You already manage a restaurant")
+    r = await db.restaurants.find_one({"id": restaurant_id}, PROJECTION)
+    if not r:
+        raise HTTPException(404, "Restaurant not found")
+    if r.get("is_claimed") and r.get("owner_id"):
+        raise HTTPException(400, "Restaurant already claimed")
+    await db.restaurants.update_one(
+        {"id": restaurant_id},
+        {"$set": {"is_claimed": True, "owner_id": x_user_id}},
+    )
+    await db.users.update_one({"id": x_user_id}, {"$set": {"restaurant_id": restaurant_id}})
+    return {"ok": True, "restaurant_id": restaurant_id}
+
+
+@api_router.put("/host/restaurant")
+async def update_my_restaurant(req: UpdateRestaurantReq, x_user_id: str = Header(...)):
+    u = await db.users.find_one({"id": x_user_id}, PROJECTION)
+    if not u or u["role"] != "host":
+        raise HTTPException(403, "Host only")
+    rid = u.get("restaurant_id")
+    if not rid:
+        raise HTTPException(400, "No restaurant linked")
+    update = {k: v for k, v in req.model_dump().items() if v is not None}
+    if "cuisine" in update:
+        update["cuisines"] = [update["cuisine"]]
+    if not update:
+        raise HTTPException(400, "Nothing to update")
+    await db.restaurants.update_one({"id": rid}, {"$set": update})
+    r = await db.restaurants.find_one({"id": rid}, PROJECTION)
+    return r
+
+
+@api_router.get("/host/menu")
+async def host_menu(x_user_id: str = Header(...)):
+    u = await db.users.find_one({"id": x_user_id}, PROJECTION)
+    if not u or u["role"] != "host":
+        raise HTTPException(403, "Host only")
+    rid = u.get("restaurant_id")
+    if not rid:
+        raise HTTPException(400, "No restaurant linked")
+    items = await db.menu_items.find({"restaurant_id": rid}, PROJECTION).to_list(500)
+    return items
+
+
+@api_router.post("/host/menu")
+async def add_menu_item(req: MenuItemReq, x_user_id: str = Header(...)):
+    u = await db.users.find_one({"id": x_user_id}, PROJECTION)
+    if not u or u["role"] != "host":
+        raise HTTPException(403, "Host only")
+    rid = u.get("restaurant_id")
+    if not rid:
+        raise HTTPException(400, "No restaurant linked")
+    item = MenuItem(
+        restaurant_id=rid, category=req.category, name=req.name, description=req.description,
+        price=req.price, image=req.image or DEFAULT_REST_IMAGE,
+        is_veg=req.is_veg, is_recommended=req.is_recommended,
+    )
+    await db.menu_items.insert_one(item.model_dump())
+    return item.model_dump()
+
+
+@api_router.put("/host/menu/{item_id}")
+async def update_menu_item(item_id: str, req: MenuItemReq, x_user_id: str = Header(...)):
+    u = await db.users.find_one({"id": x_user_id}, PROJECTION)
+    if not u or u["role"] != "host":
+        raise HTTPException(403, "Host only")
+    rid = u.get("restaurant_id")
+    existing = await db.menu_items.find_one({"id": item_id}, PROJECTION)
+    if not existing or existing["restaurant_id"] != rid:
+        raise HTTPException(404, "Not found")
+    update = req.model_dump()
+    update["image"] = update.get("image") or DEFAULT_REST_IMAGE
+    await db.menu_items.update_one({"id": item_id}, {"$set": update})
+    return {"ok": True}
+
+
+@api_router.delete("/host/menu/{item_id}")
+async def delete_menu_item(item_id: str, x_user_id: str = Header(...)):
+    u = await db.users.find_one({"id": x_user_id}, PROJECTION)
+    if not u or u["role"] != "host":
+        raise HTTPException(403, "Host only")
+    rid = u.get("restaurant_id")
+    existing = await db.menu_items.find_one({"id": item_id}, PROJECTION)
+    if not existing or existing["restaurant_id"] != rid:
+        raise HTTPException(404, "Not found")
+    await db.menu_items.delete_one({"id": item_id})
     return {"ok": True}
 
 

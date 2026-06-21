@@ -48,8 +48,12 @@ export default function Login() {
     try {
       const { user } = await api.verifyOtp(phone, otp, role, name || undefined);
       await saveUser(user);
-      if (user.role === "host") router.replace("/(host)/dashboard");
-      else router.replace("/(customer)/discover");
+      if (user.role === "host") {
+        if (user.restaurant_id) router.replace("/(host)/dashboard");
+        else router.replace("/host/setup");
+      } else {
+        router.replace("/(customer)/discover");
+      }
     } catch (e: any) {
       setErr(e.message ?? "Verification failed");
     } finally {

@@ -119,4 +119,20 @@ export const api = {
   hostOrders: (userId: string) => request<any[]>("/host/orders", { userId }),
   hostUpdateOrderStatus: (userId: string, id: string, status: string) =>
     request<any>(`/host/orders/${id}/status`, { method: "POST", body: { status }, userId }),
+  // host: restaurant onboarding & menu CRUD
+  hostUnclaimed: (userId: string) =>
+    request<any[]>("/host/restaurants/unclaimed", { userId }),
+  hostCreateRestaurant: (userId: string, body: any) =>
+    request<any>("/host/restaurants", { method: "POST", body, userId }),
+  hostClaimRestaurant: (userId: string, id: string) =>
+    request<any>(`/host/restaurants/${id}/claim`, { method: "POST", userId }),
+  hostUpdateRestaurant: (userId: string, body: any) =>
+    request<any>("/host/restaurant", { method: "PUT", body, userId }),
+  hostListMenu: (userId: string) => request<any[]>("/host/menu", { userId }),
+  hostAddMenu: (userId: string, body: any) =>
+    request<any>("/host/menu", { method: "POST", body, userId }),
+  hostUpdateMenu: (userId: string, id: string, body: any) =>
+    request<any>(`/host/menu/${id}`, { method: "PUT", body, userId }),
+  hostDeleteMenu: (userId: string, id: string) =>
+    request<any>(`/host/menu/${id}`, { method: "DELETE", userId }),
 };

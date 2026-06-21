@@ -42,8 +42,9 @@ export default function HostProfile() {
         </View>
 
         <View style={styles.list}>
-          <Row icon="settings" label="Restaurant Settings" testID="host-settings" />
-          <Row icon="bar-chart-2" label="Analytics" testID="host-analytics" />
+          <Row icon="book-open" label="Menu Editor" onPress={() => router.push("/host/menu-editor")} testID="host-menu" />
+          <Row icon="settings" label="Restaurant Settings" onPress={() => router.push("/host/edit-restaurant")} testID="host-settings" />
+          <Row icon="bar-chart-2" label="Analytics" onPress={() => router.push("/host/analytics")} testID="host-analytics" />
           <Row icon="users" label="Staff & Roles" testID="host-staff" />
           <Row icon="help-circle" label="Help & Support" testID="host-help" />
           <Row
