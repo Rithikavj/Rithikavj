@@ -1,0 +1,142 @@
+{
+  "app_name": "DineIQ",
+  "theme_strategy": {
+    "theme": "Dark",
+    "archetype": "Archetype 5 (Luxury) mixed with Archetype 7 (Electric Accent)",
+    "description": "A premium, calm, and intelligent dark mode UI. Deep navy/charcoal backgrounds create a moody, expensive feel, while vibrant teal/mint (#19E0B7) acts as a high-contrast kinetic trigger for core actions. Avoids the chaotic red/orange typical of food delivery apps to focus on an elevated dining experience."
+  },
+  "color_palette": {
+    "background": {
+      "default": "#0B0F19",
+      "paper": "#131C2D",
+      "card": "#1E293B",
+      "elevated": "#273449"
+    },
+    "primary": {
+      "main": "#19E0B7",
+      "light": "#4DF0CD",
+      "dark": "#0FA888",
+      "contrast_text": "#042F26"
+    },
+    "text": {
+      "primary": "#F8FAFC",
+      "secondary": "#94A3B8",
+      "tertiary": "#64748B",
+      "disabled": "#475569"
+    },
+    "border": {
+      "light": "#334155",
+      "divider": "#1E293B"
+    },
+    "status": {
+      "success": "#10B981",
+      "warning": "#F59E0B",
+      "error": "#EF4444",
+      "info": "#3B82F6"
+    }
+  },
+  "typography": {
+    "font_family": {
+      "heading": "Outfit, system-ui, sans-serif",
+      "body": "Plus Jakarta Sans, Inter, system-ui, sans-serif"
+    },
+    "hierarchy": {
+      "h1": "text-4xl font-bold tracking-tight text-slate-50",
+      "h2": "text-2xl font-bold tracking-tight text-slate-50",
+      "h3": "text-xl font-semibold text-slate-50",
+      "subtitle": "text-lg font-medium text-slate-300",
+      "body": "text-base font-normal text-slate-300",
+      "body_small": "text-sm font-normal text-slate-400",
+      "caption": "text-xs font-medium uppercase tracking-wider text-slate-500"
+    }
+  },
+  "layout_and_spacing": {
+    "screen_padding": "p-4 md:p-6",
+    "card_padding": "p-4",
+    "gap": {
+      "small": "gap-2",
+      "medium": "gap-4",
+      "large": "gap-6",
+      "section": "gap-8"
+    },
+    "border_radius": {
+      "button": "rounded-full",
+      "card": "rounded-2xl",
+      "sheet": "rounded-t-3xl",
+      "chip": "rounded-full",
+      "image": "rounded-xl"
+    }
+  },
+  "components": {
+    "button": {
+      "primary": "bg-[#19E0B7] text-[#042F26] font-bold rounded-full py-3 px-6 active:scale-95 transition-transform flex items-center justify-center",
+      "secondary": "bg-slate-800 text-white font-semibold rounded-full py-3 px-6 active:scale-95 transition-transform border border-slate-700",
+      "ghost": "bg-transparent text-[#19E0B7] font-semibold py-3 px-4 active:opacity-70"
+    },
+    "card": {
+      "default": "bg-slate-800/80 rounded-2xl p-4 border border-slate-700/50 shadow-lg",
+      "interactive": "bg-slate-800/80 rounded-2xl p-4 border border-slate-700/50 shadow-lg active:bg-slate-700 transition-colors"
+    },
+    "chip": {
+      "default": "bg-slate-800 text-slate-300 px-3 py-1 rounded-full text-sm font-medium border border-slate-700",
+      "active": "bg-[#19E0B7]/10 text-[#19E0B7] px-3 py-1 rounded-full text-sm font-medium border border-[#19E0B7]/30"
+    },
+    "input": {
+      "default": "bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:border-[#19E0B7] focus:ring-1 focus:ring-[#19E0B7]"
+    },
+    "bottom_navigation": {
+      "container": "bg-[#0B0F19]/90 border-t border-slate-800 pb-safe pt-2 px-6 flex justify-between items-center backdrop-blur-lg"
+    }
+  },
+  "media": {
+    "images": [
+      {
+        "category": "breakfast_menu",
+        "url": "https://images.pexels.com/photos/9619560/pexels-photo-9619560.jpeg",
+        "description": "South Indian breakfast with dosa and filter coffee"
+      },
+      {
+        "category": "lunch_menu",
+        "url": "https://images.pexels.com/photos/17497626/pexels-photo-17497626.jpeg",
+        "description": "Rich chicken biryani in a dark bowl"
+      },
+      {
+        "category": "dinner_menu",
+        "url": "https://images.pexels.com/photos/4224314/pexels-photo-4224314.jpeg",
+        "description": "Plated chicken biryani on dark textured surface"
+      },
+      {
+        "category": "beverage_menu",
+        "url": "https://images.pexels.com/photos/38201891/pexels-photo-38201891.png",
+        "description": "South Indian filter coffee in traditional steel tumblers"
+      },
+      {
+        "category": "restaurant_hero",
+        "url": "https://images.pexels.com/photos/29222614/pexels-photo-29222614.jpeg",
+        "description": "Modern dark restaurant interior with moody lighting"
+      }
+    ],
+    "icons": {
+      "library": "lucide-react-native",
+      "style": "Stroke width 1.5, slightly rounded caps. Avoid filled icons except for active bottom nav states."
+    },
+    "illustrations": {
+      "empty_states": "Use minimalist line-art illustrations accented with #19E0B7. e.g., A minimalist cloche for 'No orders yet', outline of a map pin for 'No restaurants found'."
+    }
+  },
+  "accessibility_and_testing": {
+    "contrast": "Ensure all text on dark background meets APCA or WCAG AA standards. Soft grays must be legible. Off-white (#F8FAFC) is preferred over pure white.",
+    "touch_targets": "All interactive elements (buttons, links, icons) must have a minimum hit area of 44x44px.",
+    "testing": "All interactive and key informational elements MUST include a `data-testid` attribute (kebab-case, role-based). Example: `data-testid=\"join-queue-button\"`"
+  },
+  "role_based_flows": {
+    "customer": {
+      "key_focus": "Discovery, live tracking, and seamless pre-ordering.",
+      "ui_elements": "Wait-time chips with live pulsing animation (using #19E0B7 for fast, #F59E0B for medium, #EF4444 for long). Whatsapp-style notification cards for chat updates."
+    },
+    "host": {
+      "key_focus": "High-density data view, quick actions, queue management.",
+      "ui_elements": "Control-room grid layout. Actionable list rows with swipe-to-seat or swipe-to-remove actions. Bold, readable typography for party sizes and wait times."
+    }
+  }
+}
