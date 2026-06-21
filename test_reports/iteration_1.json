@@ -1,0 +1,48 @@
+{
+  "summary": "DineIQ backend tested end-to-end against the public Expo backend URL. 29/29 pytest tests passed across health, auth (OTP mock, role-split users), restaurants & menus (seeded 6 restaurants verified), customer queue (join, idempotent, my-queue, live_queue with is_you flag, 404), notifications (auto-generated for queue join, order confirm, table ready, order updates), orders (DQ#### short_id, total math, persistence), host (dashboard, queue list with position, walk-in, kitchen orders), end-to-end flow (join -> pre-order -> host notify -> table_ready -> self-seated -> preparing -> ready_to_serve), role-based authorization (customer blocked from /host/dashboard, other user blocked from cancel), and MongoDB ObjectId serialization (recursive _id key check on 7 critical endpoints). No critical issues found.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "GET /api/auth/me without X-User-Id header",
+        "issue": "Returns 422 (FastAPI validation) instead of 401 because Header(...) is declared required. Other authenticated endpoints behave the same. Functionally fine but inconsistent with the dineiq custom 401 in /api/queue/join. Not blocking."
+      },
+      {
+        "endpoint": "GET /api/me",
+        "issue": "Unused/dead route that always raises 401 'use /auth/me'. Safe to remove for cleanliness."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_dineiq_backend.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Remove the dead GET /api/me handler in server.py (line ~252).",
+    "(Optional) Return a consistent 401 instead of 422 when X-User-Id header is missing on authenticated endpoints; use a dependency that raises HTTPException(401)."
+  ],
+  "critical_code_review_comments": [
+    "server.py uses PROJECTION={'_id': 0} on all reads and Pydantic model_dump() on writes, so no ObjectId leakage. Verified by recursive _id check on 7 endpoints.",
+    "All endpoints prefixed with /api router; CORS open; load_dotenv loads backend/.env before reading env vars. Looks correct.",
+    "compute_wait + queue_position recomputed on every list call — fine for demo scale (<=200 entries) but O(n) per restaurant on the list endpoint; consider caching/aggregation for production scale.",
+    "Auth model is mocked (token == user.id, no JWT). Acceptable for prototype; should NOT ship to production as-is.",
+    "server.py is 874 lines — borderline; could be split into routers (auth, restaurants, queue, orders, host, seed) for maintainability."
+  ],
+  "updated_files": [
+    "/app/backend/tests/conftest.py (new)",
+    "/app/backend/tests/test_dineiq_backend.py (new)"
+  ],
+  "success_rate": {"backend": "100% (29/29)", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "No new seed data. Backend auto-seeds 6 restaurants + 10 demo waiting parties on Murugan Idli Shop on startup; tests created transient TEST users / queue / orders with unique phone numbers per session and did not modify seed data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run with: `python -m pytest /app/backend/tests/test_dineiq_backend.py -v`. Tests use EXPO_PUBLIC_BACKEND_URL via /app/frontend/.env (conftest falls back to the preview URL). All tests are idempotent across runs (unique phone per session). DO NOT change server.py — backend is working. The test file uses class attributes to share queue_id/order_id between tests within a class, so run with default pytest order. A recursive `_no_objectid` walker is used instead of substring 'in' check because field names like 'restaurant_id' contain '_id'.",
+  "rca_of_issue": "N/A - no bugs to RCA. Initial test run showed 16 failures, all rooted in my own test helper bug (`'_id' in json_string` matched 'restaurant_id'/'user_id'/'queue_id' substrings, causing first failure to skip class attribute setup which cascaded). Fixed the helper to recursively check dict keys; rerun = 29/29 passed. Real backend behavior was correct throughout."
+}
