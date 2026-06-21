@@ -6,16 +6,28 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { clearUser, loadUser, User } from "@/src/api";
+import { api, clearUser, loadUser, User } from "@/src/api";
 import { colors, fontSize, radius, spacing } from "@/src/theme";
 
 export default function Profile() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
+  const [pass, setPass] = useState<any | null>(null);
 
   useFocusEffect(useCallback(() => {
-    loadUser().then(setUser);
+    (async () => {
+      const u = await loadUser();
+      setUser(u);
+      if (u?.id) {
+        try { setPass(await api.getPass(u.id)); } catch {}
+      }
+    })();
   }, []));
+
+  const passActive = pass?.active;
+  const expiresLabel = pass?.expires_at
+    ? new Date(pass.expires_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+    : "";
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -34,27 +46,41 @@ export default function Profile() {
           </View>
         </View>
 
-        {/* Premium teaser */}
-        <View style={styles.passCard} testID="dineiq-pass-card">
+        {/* Premium teaser / active card */}
+        <TouchableOpacity
+          style={styles.passCard}
+          onPress={() => router.push("/pass")}
+          activeOpacity={0.9}
+          testID="dineiq-pass-card"
+        >
           <View style={styles.passHeader}>
             <View style={styles.passBadge}>
               <Feather name="zap" size={14} color={colors.primary} />
-              <Text style={styles.passBadgeText}>PREMIUM</Text>
+              <Text style={styles.passBadgeText}>{passActive ? "ACTIVE" : "PREMIUM"}</Text>
             </View>
+            <Feather name="chevron-right" size={18} color={colors.primary} />
           </View>
           <Text style={styles.passTitle}>DineIQ Pass</Text>
-          <Text style={styles.passSub}>
-            Skip ahead 1-2 spots in queues, group booking & ETA alerts for favourite spots.
-          </Text>
+          {passActive ? (
+            <Text style={styles.passSub}>
+              You're on the {pass.plan === "yearly" ? "Yearly" : "Monthly"} plan · Renews {expiresLabel}
+            </Text>
+          ) : (
+            <Text style={styles.passSub}>
+              Skip ahead 1-2 spots in queues, group booking & ETA alerts for favourite spots.
+            </Text>
+          )}
           <View style={styles.passFeatures}>
             <PassFeature icon="zap" text="Priority Queue Access" />
             <PassFeature icon="users" text="Group Booking" />
             <PassFeature icon="bell" text="Favourite Restaurant Alerts" />
           </View>
-          <TouchableOpacity style={styles.passBtn} testID="passes-cta">
-            <Text style={styles.passBtnText}>Get DineIQ Pass · ₹99/month</Text>
-          </TouchableOpacity>
-        </View>
+          <View style={styles.passBtn} testID="passes-cta">
+            <Text style={styles.passBtnText}>
+              {passActive ? "Manage Subscription" : "Get DineIQ Pass · ₹99/month"}
+            </Text>
+          </View>
+        </TouchableOpacity>
 
         <View style={styles.list}>
           <Row icon="bell" label="Notifications" onPress={() => router.push("/notifications")} testID="profile-notifications" />

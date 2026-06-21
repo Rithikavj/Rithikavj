@@ -1,9 +1,9 @@
 import { Feather } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -11,6 +11,7 @@ import { api, loadUser } from "@/src/api";
 import { colors, fontSize, radius, spacing, waitColor } from "@/src/theme";
 
 export default function Dashboard() {
+  const router = useRouter();
   const [d, setD] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -113,6 +114,25 @@ export default function Dashboard() {
           />
         </View>
 
+        {/* Analytics CTA */}
+        <TouchableOpacity
+          style={styles.analyticsCta}
+          onPress={() => router.push("/host/analytics")}
+          activeOpacity={0.85}
+          testID="open-analytics-btn"
+        >
+          <View style={styles.analyticsIcon}>
+            <Feather name="bar-chart-2" size={22} color={colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.analyticsTitle}>View Detailed Analytics</Text>
+            <Text style={styles.analyticsSub}>
+              Hourly traffic, walk-away rate, top items & revenue
+            </Text>
+          </View>
+          <Feather name="arrow-right" size={20} color={colors.primary} />
+        </TouchableOpacity>
+
         {/* Insights card */}
         <View style={styles.insight}>
           <Text style={styles.insightTitle}>Today's Snapshot</Text>
@@ -177,4 +197,16 @@ const styles = StyleSheet.create({
   },
   insightTitle: { color: colors.primary, fontWeight: "800", fontSize: fontSize.md, marginBottom: spacing.sm },
   insightText: { color: colors.textSecondary, fontSize: fontSize.sm, lineHeight: 22 },
+  analyticsCta: {
+    marginTop: spacing.lg, flexDirection: "row", alignItems: "center", gap: spacing.md,
+    padding: spacing.md, backgroundColor: colors.bgCard, borderRadius: radius.lg,
+    borderWidth: 1, borderColor: colors.primary,
+  },
+  analyticsIcon: {
+    width: 44, height: 44, borderRadius: radius.pill,
+    backgroundColor: colors.primaryAlpha10, alignItems: "center", justifyContent: "center",
+    borderWidth: 1, borderColor: colors.primary,
+  },
+  analyticsTitle: { color: colors.text, fontWeight: "800", fontSize: fontSize.md },
+  analyticsSub: { color: colors.textSecondary, fontSize: fontSize.xs, marginTop: 2 },
 });

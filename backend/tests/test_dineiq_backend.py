@@ -390,3 +390,215 @@ class TestSerialization:
             r = api_client.request(method, f"{b}{path}", headers=hdrs)
             assert r.status_code == 200, f"{path} -> {r.status_code}"
             _no_objectid(r.json())
+
+
+
+# ---------- DineIQ Pass (subscription mock) ----------
+
+@pytest.fixture(scope="module")
+def pass_user(api_client, b):
+    """A fresh customer used for pass + priority queue tests."""
+    phone = f"55{int(time.time()) % 100000000:08d}{uuid.uuid4().hex[:2]}"
+    r = api_client.post(f"{b}/api/auth/verify-otp",
+                        json={"phone": phone, "otp": "123456",
+                              "role": "customer", "name": "Pass Diner"})
+    assert r.status_code == 200, r.text
+    return r.json()["user"]
+
+
+class TestDineIQPass:
+    def test_get_pass_initial_inactive(self, api_client, b, pass_user):
+        r = api_client.get(f"{b}/api/me/pass", headers=_h(pass_user))
+        assert r.status_code == 200, r.text
+        d = r.json()
+        _no_objectid(d)
+        assert d["active"] is False
+        assert d["plan"] is None
+        assert d["started_at"] is None
+        assert d["expires_at"] is None
+        # plans payload
+        assert "plans" in d
+        assert d["plans"]["monthly"]["price"] == 99
+        assert d["plans"]["monthly"]["days"] == 30
+        assert d["plans"]["monthly"]["label"]
+        assert d["plans"]["yearly"]["price"] == 999
+        assert d["plans"]["yearly"]["days"] == 365
+        assert d["plans"]["yearly"]["label"]
+
+    def test_subscribe_monthly_activates(self, api_client, b, pass_user):
+        r = api_client.post(f"{b}/api/me/pass/subscribe",
+                            json={"plan": "monthly"}, headers=_h(pass_user))
+        assert r.status_code == 200, r.text
+        d = r.json()
+        _no_objectid(d)
+        assert d["ok"] is True
+        u = d["user"]
+        assert u["pass_active"] is True
+        assert u["pass_plan"] == "monthly"
+        assert u["pass_started_at"]
+        assert u["pass_expires_at"]
+        # verify via GET
+        from datetime import datetime, timezone, timedelta
+        exp = datetime.fromisoformat(u["pass_expires_at"])
+        delta_days = (exp - datetime.now(timezone.utc)).days
+        # ~30 days (allow some slack)
+        assert 28 <= delta_days <= 30, f"expected ~30 days, got {delta_days}"
+        TestDineIQPass.first_expiry = u["pass_expires_at"]
+
+        # GET /me/pass now active
+        g = api_client.get(f"{b}/api/me/pass", headers=_h(pass_user)).json()
+        assert g["active"] is True
+        assert g["plan"] == "monthly"
+
+    def test_subscribe_yearly_extends_existing(self, api_client, b, pass_user):
+        from datetime import datetime
+        r = api_client.post(f"{b}/api/me/pass/subscribe",
+                            json={"plan": "yearly"}, headers=_h(pass_user))
+        assert r.status_code == 200, r.text
+        u = r.json()["user"]
+        assert u["pass_plan"] == "yearly"
+        new_exp = datetime.fromisoformat(u["pass_expires_at"])
+        old_exp = datetime.fromisoformat(TestDineIQPass.first_expiry)
+        delta_days = (new_exp - old_exp).days
+        # Should extend by ~365 days, NOT reset to now+365
+        assert 360 <= delta_days <= 366, \
+            f"expected ~365d extension, got {delta_days}"
+
+    def test_cancel_pass_marks_inactive_immediately(self, api_client, b,
+                                                    pass_user):
+        r = api_client.post(f"{b}/api/me/pass/cancel", headers=_h(pass_user))
+        assert r.status_code == 200
+        # GET /me/pass should now report inactive (helper checks pass_active AND exp>now)
+        g = api_client.get(f"{b}/api/me/pass", headers=_h(pass_user)).json()
+        assert g["active"] is False
+        assert g["plan"] is None
+
+
+# ---------- Pass Priority queue jumping ----------
+
+class TestPassPriorityQueue:
+    """Pass holder joins after non-pass user but jumps ahead."""
+
+    def test_priority_user_jumps_ahead(self, api_client, b, murugan):
+        # Create non-pass user A
+        phone_a = f"44{int(time.time()) % 100000000:08d}{uuid.uuid4().hex[:2]}"
+        ua = api_client.post(f"{b}/api/auth/verify-otp",
+                             json={"phone": phone_a, "otp": "123456",
+                                   "role": "customer", "name": "NonPass A"}
+                             ).json()["user"]
+        # Create user B & activate Pass
+        phone_b = f"44{int(time.time()) % 100000000:08d}{uuid.uuid4().hex[:2]}"
+        ub = api_client.post(f"{b}/api/auth/verify-otp",
+                             json={"phone": phone_b, "otp": "123456",
+                                   "role": "customer", "name": "Pass B"}
+                             ).json()["user"]
+        sub = api_client.post(f"{b}/api/me/pass/subscribe",
+                              json={"plan": "monthly"}, headers=_h(ub))
+        assert sub.status_code == 200
+        assert sub.json()["user"]["pass_active"] is True
+
+        # A joins first
+        ra = api_client.post(f"{b}/api/queue/join",
+                             json={"restaurant_id": murugan["id"],
+                                   "party_size": 2}, headers=_h(ua))
+        assert ra.status_code == 200, ra.text
+        a_entry = ra.json()
+        a_pos = a_entry["position"]
+        assert a_entry.get("is_priority") in (False, None)
+
+        # Slight delay so joined_at differs
+        time.sleep(0.5)
+
+        # B (pass) joins after
+        rb = api_client.post(f"{b}/api/queue/join",
+                             json={"restaurant_id": murugan["id"],
+                                   "party_size": 2}, headers=_h(ub))
+        assert rb.status_code == 200, rb.text
+        b_entry = rb.json()
+        assert b_entry["is_priority"] is True, \
+            "Pass holder's queue entry should be is_priority=true"
+
+        # B should be ahead of A: re-check via /queue/{a_entry['id']}
+        live = api_client.get(
+            f"{b}/api/queue/{a_entry['id']}").json()["live_queue"]
+        # find positions
+        a_live = next(q for q in live if q["id"] == a_entry["id"])
+        b_live = next(q for q in live if q["id"] == b_entry["id"])
+        assert b_live["position"] < a_live["position"], (
+            f"Pass B(pos={b_live['position']}) must be ahead of "
+            f"A(pos={a_live['position']})"
+        )
+
+        # Priority entries listed first in live_queue (sorted by position)
+        # ensure live_queue is sorted by position ascending
+        positions = [q["position"] for q in live]
+        assert positions == sorted(positions), \
+            "live_queue should be sorted by position ascending"
+
+        # All priority entries should come before any non-priority entry
+        seen_non_priority = False
+        for q in live:
+            if not q.get("is_priority"):
+                seen_non_priority = True
+            elif seen_non_priority:
+                pytest.fail("priority entry appears after non-priority entry")
+
+
+# ---------- Host analytics ----------
+
+class TestHostAnalytics:
+    def test_analytics_requires_host(self, api_client, b, customer):
+        r = api_client.get(f"{b}/api/host/analytics", headers=_h(customer))
+        assert r.status_code == 403
+
+    def test_analytics_structure_and_nonempty(self, api_client, b, host):
+        # Reset to guarantee historical seed (run once)
+        reset = api_client.post(f"{b}/api/seed/reset")
+        assert reset.status_code == 200, reset.text
+        # After reset, original users are gone; recreate host
+        phone = f"33{int(time.time()) % 100000000:08d}"
+        api_client.post(f"{b}/api/auth/request-otp",
+                        json={"phone": phone, "role": "host"})
+        h = api_client.post(f"{b}/api/auth/verify-otp",
+                            json={"phone": phone, "otp": "123456",
+                                  "role": "host", "name": "Analytics Host"}
+                            ).json()["user"]
+        assert h.get("restaurant_id")
+
+        r = api_client.get(f"{b}/api/host/analytics", headers=_h(h))
+        assert r.status_code == 200, r.text
+        d = r.json()
+        _no_objectid(d)
+
+        # top-level
+        assert "restaurant" in d and d["restaurant"]
+        assert "summary" in d
+        assert "hourly" in d and isinstance(d["hourly"], list) and len(d["hourly"]) == 24
+        assert "weekly" in d and isinstance(d["weekly"], list) and len(d["weekly"]) == 7
+        assert "top_items" in d and isinstance(d["top_items"], list)
+        assert len(d["top_items"]) <= 5
+
+        # summary fields
+        s = d["summary"]
+        for f in ("parties_today", "parties_yesterday", "pct_change",
+                  "seated_today", "cancelled_today", "no_shows_today",
+                  "waiting_now", "avg_wait_min", "walk_away_rate",
+                  "no_show_rate", "seated_rate", "revenue_today",
+                  "orders_today", "peak_hour"):
+            assert f in s, f"missing summary.{f}"
+
+        # non-empty assertions after reset
+        assert s["parties_today"] >= 30, (
+            f"expected >=30 parties_today after seed, got {s['parties_today']}"
+        )
+        assert s["revenue_today"] > 0, "revenue_today should be > 0"
+        assert len(d["top_items"]) > 0
+        assert any(c > 0 for c in d["hourly"]), "hourly buckets should have data"
+        assert any(c > 0 for c in d["weekly"]), "weekly buckets should have data"
+
+        # top_items structure
+        for it in d["top_items"]:
+            for f in ("id", "name", "image", "qty", "revenue"):
+                assert f in it
+            assert it["qty"] > 0
+            assert it["revenue"] > 0

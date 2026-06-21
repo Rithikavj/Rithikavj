@@ -9,14 +9,17 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { api, loadUser } from "@/src/api";
+import RealMap from "@/src/components/real-map";
 import { colors, fontSize, radius, spacing, waitColor, waitLabel } from "@/src/theme";
 
 const CUISINES = ["All", "South Indian", "Hyderabadi", "North Indian", "Cafe", "Modern Indian"];
+type ViewMode = "list" | "map";
 
 export default function Discover() {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [cuisine, setCuisine] = useState("All");
+  const [view, setView] = useState<ViewMode>("list");
   const [rests, setRests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -101,10 +104,38 @@ export default function Discover() {
             );
           })}
         </ScrollView>
+
+        {/* List / Map toggle */}
+        <View style={styles.toggleRow}>
+          <TouchableOpacity
+            style={[styles.toggleBtn, view === "list" && styles.toggleBtnActive]}
+            onPress={() => setView("list")}
+            testID="view-list-btn"
+          >
+            <Feather name="list" size={14} color={view === "list" ? colors.primary : colors.textSecondary} />
+            <Text style={[styles.toggleText, view === "list" && styles.toggleTextActive]}>List</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toggleBtn, view === "map" && styles.toggleBtnActive]}
+            onPress={() => setView("map")}
+            testID="view-map-btn"
+          >
+            <Feather name="map" size={14} color={view === "map" ? colors.primary : colors.textSecondary} />
+            <Text style={[styles.toggleText, view === "map" && styles.toggleTextActive]}>Map</Text>
+          </TouchableOpacity>
+          <Text style={styles.resultsCount}>{rests.length} nearby</Text>
+        </View>
       </View>
 
-      {/* Hero map illustration */}
-      <FlatList
+      {view === "map" ? (
+        <View style={styles.mapFullWrap}>
+          <RealMap
+            restaurants={rests}
+            onMarkerPress={(id) => router.push(`/restaurant/${id}`)}
+          />
+        </View>
+      ) : (
+        <FlatList
         data={rests}
         keyExtractor={(r) => r.id}
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }}
@@ -130,10 +161,10 @@ export default function Discover() {
             <Pin style={{ bottom: 30, left: 70 }} m={20} />
             <Pin style={{ bottom: 50, right: 30 }} m={45} />
             <Pin style={{ top: 90, left: "45%" }} m={5} />
-            <View style={styles.mapBadge}>
+            <TouchableOpacity style={styles.mapBadge} onPress={() => setView("map")} testID="open-map-from-hero">
               <Feather name="navigation" size={14} color={colors.primary} />
-              <Text style={styles.mapBadgeText}>Live wait times around you</Text>
-            </View>
+              <Text style={styles.mapBadgeText}>Tap to open full map</Text>
+            </TouchableOpacity>
           </View>
         }
         renderItem={({ item }) => <RestaurantCard item={item} onPress={() => router.push(`/restaurant/${item.id}`)} />}
@@ -151,6 +182,7 @@ export default function Discover() {
           )
         }
       />
+      )}
     </SafeAreaView>
   );
 }
@@ -280,4 +312,17 @@ const styles = StyleSheet.create({
   ratingText: { color: colors.text, fontSize: 12, fontWeight: "700" },
   empty: { paddingVertical: spacing.xxl, alignItems: "center", gap: spacing.md },
   emptyText: { color: colors.textSecondary, fontSize: fontSize.md },
+  toggleRow: {
+    flexDirection: "row", gap: spacing.sm, marginTop: spacing.md, alignItems: "center",
+  },
+  toggleBtn: {
+    flexDirection: "row", gap: 6, alignItems: "center",
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.pill,
+    backgroundColor: colors.bgCard, borderWidth: 1, borderColor: colors.borderSoft,
+  },
+  toggleBtnActive: { backgroundColor: colors.primaryAlpha10, borderColor: colors.primary },
+  toggleText: { color: colors.textSecondary, fontWeight: "700", fontSize: 12 },
+  toggleTextActive: { color: colors.primary },
+  resultsCount: { color: colors.textMuted, fontSize: 12, marginLeft: "auto" },
+  mapFullWrap: { flex: 1, padding: spacing.lg },
 });

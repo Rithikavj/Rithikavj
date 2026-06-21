@@ -98,8 +98,15 @@ export const api = {
   myNotifications: (userId: string) => request<any[]>("/notifications/me", { userId }),
   readAllNotifications: (userId: string) =>
     request<any>("/notifications/read-all", { method: "POST", userId }),
+  // DineIQ Pass
+  getPass: (userId: string) => request<any>("/me/pass", { userId }),
+  subscribePass: (userId: string, plan: "monthly" | "yearly") =>
+    request<any>("/me/pass/subscribe", { method: "POST", body: { plan }, userId }),
+  cancelPass: (userId: string) =>
+    request<any>("/me/pass/cancel", { method: "POST", userId }),
   // host
   hostDashboard: (userId: string) => request<any>("/host/dashboard", { userId }),
+  hostAnalytics: (userId: string) => request<any>("/host/analytics", { userId }),
   hostQueue: (userId: string) => request<any[]>("/host/queue", { userId }),
   hostNotify: (userId: string, id: string) =>
     request<any>(`/host/queue/${id}/notify`, { method: "POST", userId }),

@@ -1,0 +1,55 @@
+{
+  "summary": "DineIQ backend follow-up features (DineIQ Pass + Host Analytics + Pass priority queue) tested end-to-end on the public Expo backend URL. 36/36 pytest tests passed (29 regression from iteration_1 + 7 new). New coverage: GET /api/me/pass (plans payload with monthly=99/30d, yearly=999/365d, inactive default), POST /api/me/pass/subscribe monthly (~30d expiry), POST again yearly EXTENDS expiry by ~365 days (not reset), POST /api/me/pass/cancel makes pass_is_active immediately false, queue.is_priority=true for pass holder, pass holder jumps ahead of earlier non-pass entry in /queue/{id} live_queue, live_queue sorted by position with all priority entries before non-priority, GET /api/host/analytics 403 for non-host, full analytics structure (summary 14 fields, hourly len=24, weekly len=7, top_items max 5 with id/name/image/qty/revenue), after POST /api/seed/reset parties_today>=30, revenue_today>0, top_items>0, hourly has data, weekly has data. MongoDB _id leakage check extended to all new endpoints — none leaked. All previous endpoints still pass (backward compatible).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/me/pass/cancel",
+        "issue": "Spec says 'keeps expires_at so they keep benefits until end of billing period', but the implementation only flips pass_active=false and pass_is_active() then returns false immediately. So 'keep benefits till period end' is not actually enforced anywhere — there is no reactivation flow that uses the residual expires_at. Cosmetic / behavioral inconsistency with the marketing copy; functionally matches what the request specified ('returns false immediately after cancel')."
+      },
+      {
+        "endpoint": "GET /api/host/analytics summary.peak_hour",
+        "issue": "Uses datetime.strftime('%-I %p') which is GNU/Linux-specific (not portable to Windows). Fine on the Linux container, but flag for portability. Also returns None if buckets are all zero — handled by tests."
+      },
+      {
+        "endpoint": "Carry-over from iteration_1",
+        "issue": "GET /api/auth/me without X-User-Id still returns 422 instead of 401; dead GET /api/me handler still present. Not blocking."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [],
+    "react_native_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_dineiq_backend.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Decide on /me/pass/cancel semantics: either drop the 'keep benefits till period end' copy, or add a /me/pass endpoint state of 'cancelled_but_active_until' and have pass_is_active() honour expires_at regardless of pass_active flag until expiry.",
+    "(Optional) Replace strftime('%-I %p') in /host/analytics with a portable format (e.g. f\"{peak_dt.hour % 12 or 12} {'AM' if peak_dt.hour<12 else 'PM'}\").",
+    "(Optional, carry-over) Remove dead GET /api/me handler and standardise 401 vs 422 on missing X-User-Id."
+  ],
+  "critical_code_review_comments": [
+    "server.py grew to ~1170 lines — getting large. Consider splitting into routers (auth, restaurants, queue, orders, pass, host, host_analytics, seed). Not urgent.",
+    "/host/analytics is O(N) over all 24h queue + week queue entries on every call. Fine at demo scale (<2000 entries), but for production consider $facet aggregation or pre-computed hourly buckets.",
+    "queue_position() and live_queue sort are duplicated in /queue/{id}, /host/queue, and queue_position helper. Consider extracting a single sort function (priority desc, joined_at asc).",
+    "pass_is_active() catches bare Exception — fine for prototype, but log the parse error so a malformed pass_expires_at isn't silently ignored.",
+    "POST /api/seed/reset is unauthenticated and wipes everything including users. Acceptable for a dev demo, but MUST be removed / gated before production.",
+    "PROJECTION={'_id': 0} consistently used; all new endpoints verified to have no _id leak via recursive walker.",
+    "Pass priority logic is correct: queue_position and live_queue both sort by (not is_priority, joined_at) so priority users always come first. Verified empirically (B joined 0.5s after A but ended up at lower position).",
+    "Seed historical generator now creates ~35 24h entries + ~50 week entries + ~21 historical orders — enough to make analytics non-empty after reset (verified parties_today>=30, revenue_today>0)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_dineiq_backend.py (added TestDineIQPass, TestPassPriorityQueue, TestHostAnalytics classes — 7 new tests)"
+  ],
+  "success_rate": {"backend": "100% (36/36)", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "Tests call POST /api/seed/reset once inside TestHostAnalytics::test_analytics_structure_and_nonempty (LAST class executed) to validate non-empty analytics after fresh historical seed. The reset wipes all users/queue/orders/notifications including any TEST_ users created earlier in the same run — this is acceptable because the reset is the final destructive action in the test suite. No persistent test data added beyond seed generator output.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run: `python -m pytest backend/tests/test_dineiq_backend.py -v`. Tests use EXPO_PUBLIC_BACKEND_URL (conftest falls back to preview URL). IMPORTANT: TestHostAnalytics::test_analytics_structure_and_nonempty calls POST /api/seed/reset which wipes the DB — it is intentionally the last test class in source order so it doesn't break prior tests. If you add new test classes, place them BEFORE TestHostAnalytics, or move the reset call. Pass priority test relies on a 0.5s sleep between user A and user B joining so joined_at differs; if you parallelise, make this gap larger. The _no_objectid helper walks dict keys recursively (not substring) — re-use it for new endpoints.",
+  "rca_of_issue": "N/A — no bugs found. All 11 requested feature checks (seed reset, /me/pass GET/subscribe/cancel, pass extension semantics, priority queue jumping, live_queue sort, host/analytics structure + 403 + non-empty after reset, backward compat, _id serialization) verified passing."
+}
